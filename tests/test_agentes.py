@@ -6,7 +6,7 @@ import pytest
 
 from laberinto import (
     AgenteDFS,
-    AgenteExploradorFronteras,
+    AgenteAStar,
     DIRECCIONES,
     Entorno,
     crear_laberinto,
@@ -55,8 +55,8 @@ def test_agentes_coinciden_sobre_existencia_de_solucion(semilla):
     esperado = existe_solucion(laberinto, entrada)
 
     dfs = AgenteDFS(Entorno(laberinto)).resolver()
-    fronteras = AgenteExploradorFronteras(
-        Entorno(laberinto), semilla=semilla
+    fronteras = AgenteAStar(
+        Entorno(laberinto), salida=salida, semilla=semilla
     ).resolver()
 
     assert dfs["tiene_solucion"] == esperado
@@ -70,17 +70,9 @@ def test_agentes_coinciden_sobre_existencia_de_solucion(semilla):
 
 
 @pytest.mark.parametrize("semilla", range(20))
-def test_dfs_poda_rutas_redundantes_y_devuelve_ruta_minima(semilla):
+def test_dfs_devuelve_ruta_minima_entre_todas_las_rutas(semilla):
     laberinto, entrada, _ = crear_laberinto(12, 12, semilla)
     informe, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
-
-    mejor_profundidad = {}
-    expansiones = [e for e in eventos if e.tipo in {"inicio", "avanzar"}]
-    for evento in expansiones:
-        profundidad = len(evento.ruta)
-        assert profundidad < mejor_profundidad.get(evento.posicion, float("inf"))
-        mejor_profundidad[evento.posicion] = profundidad
-    assert informe["expandidas"] == len(expansiones)
 
     if informe["tiene_solucion"]:
         distancias = {entrada: 1}
@@ -107,26 +99,26 @@ def test_dfs_registra_podas_y_conserva_el_mejor_camino_al_final():
     informe, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
 
     assert informe["podas"] > 0
-    assert informe["expandidas"] < informe["pasos"]
     assert eventos[-1].tipo == "final"
-    assert eventos[-1].ruta == tuple(informe["camino"])
+    if informe["tiene_solucion"]:
+        assert eventos[-1].ruta == tuple(informe["camino"])
 
 
 def test_ejecucion_genera_eventos_reproducibles():
-    laberinto, _, _ = crear_laberinto(10, 10, 19)
-    agente = AgenteExploradorFronteras(Entorno(laberinto), semilla=7)
+    laberinto, _, salida = crear_laberinto(10, 10, 19)
+    agente = AgenteAStar(Entorno(laberinto), salida=salida, semilla=7)
     informe_1, eventos_1 = agente.ejecutar()
     informe_2, eventos_2 = agente.ejecutar()
     assert informe_1 == informe_2
     assert eventos_1 == eventos_2
     assert eventos_1[0].tipo == "inicio"
-    assert eventos_1[-1].tipo in {"salida", "sin_solucion"}
+    assert eventos_1[-1].tipo in {"salida", "sin_solucion", "final"}
 
 
 def test_truncamiento_es_inconcluso():
-    laberinto, _, _ = crear_laberinto(15, 15, 2)
-    informe = AgenteExploradorFronteras(
-        Entorno(laberinto), max_movimientos=1, semilla=0
+    laberinto, _, salida = crear_laberinto(15, 15, 2)
+    informe = AgenteAStar(
+        Entorno(laberinto), salida=salida, max_pasos=1, semilla=0
     ).resolver()
     assert informe["truncado"]
-    assert informe["motivo_truncado"] == "límite de movimientos alcanzado"
+    assert informe["motivo_truncado"] == "límite de pasos alcanzado"

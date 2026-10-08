@@ -38,10 +38,8 @@ def preparar_animacion(
                 "t": evento.tipo,
                 "p": evento.posicion,
                 "v": nuevas,
-                "f": sorted(evento.fronteras),
                 "r": evento.ruta,
                 "m": evento.mensaje,
-                "mv": max(0, len(evento.trayectoria) - 1),
                 "o": indice,
             }
         )
@@ -217,7 +215,6 @@ _PLANTILLA = r"""<!doctype html>
       <div class="legend">
         <span><i class="dot" style="background:#ef476f"></i><span id="markerLabel">Agente</span></span>
         <span><i class="dot" style="background:#b9e5f7"></i>Visitadas</span>
-        <span><i class="dot" style="background:#ffd166"></i>Fronteras</span>
         <span><i class="dot" style="background:#c9b8ff"></i>Ruta planificada</span>
         <span><i class="dot" style="background:#263238"></i>Desconocido</span>
       </div>
@@ -286,18 +283,16 @@ function currentPosition() {
 function draw(agentPoint, agentAlpha = 1) {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
-  const event = events[index] || {f:[], r:[]};
-  const frontiers = new Set(event.f.map(key));
+  const event = events[index] || {r:[]};
   const route = new Set(event.r.map(key));
   const bestPathOnly = Boolean(index === events.length - 1 && DATA.resultado?.tiene_solucion && route.size);
 
   for (let row = 0; row < DATA.filas; row++) {
     for (let col = 0; col < DATA.columnas; col++) {
       const id = `${row},${col}`;
-      const known = visited.has(id) || frontiers.has(id) || id === key(DATA.entrada);
+      const known = visited.has(id) || id === key(DATA.entrada);
       let fill = DATA.vistaAgente && !known ? COLORS.unknown : COLORS.free;
       if (!bestPathOnly && known && visited.has(id)) fill = COLORS.visited;
-      if (!bestPathOnly && frontiers.has(id)) fill = COLORS.frontier;
       if (route.has(id)) fill = COLORS.route;
       ctx.fillStyle = fill;
       ctx.fillRect(offsetX + col * cell, offsetY + row * cell, cell + .35, cell + .35);
@@ -311,7 +306,7 @@ function draw(agentPoint, agentAlpha = 1) {
   for (let row = 0; row < DATA.filas; row++) {
     for (let col = 0; col < DATA.columnas; col++) {
       const id = `${row},${col}`;
-      if (DATA.vistaAgente && !(visited.has(id) || frontiers.has(id) || id === key(DATA.entrada))) continue;
+      if (DATA.vistaAgente && !(visited.has(id) || id === key(DATA.entrada))) continue;
       const mask = DATA.paredes[row][col];
       const x = offsetX + col * cell, y = offsetY + row * cell;
       if (mask & 1) { ctx.moveTo(x, y); ctx.lineTo(x + cell, y); }
@@ -365,9 +360,7 @@ function updateUI() {
   } else if (index < events.length - 1) {
     ui.statusTitle.textContent = event.t === 'salida' ? 'Salida detectada' : 'Exploración en curso';
     ui.message.textContent = event.m;
-    ui.metrics.innerHTML = isDFS
-      ? metric('Celdas observadas', visited.size) + metric('Longitud de la ruta actual', event.r.length)
-      : metric('Celdas observadas', visited.size) + metric('Fronteras activas', event.f.length) + metric('Movimientos', event.mv);
+    ui.metrics.innerHTML = metric('Celdas observadas', visited.size) + metric('Longitud de la ruta actual', event.r.length);
   } else {
     showResult(event);
   }
@@ -387,10 +380,11 @@ function showResult(event) {
     ui.statusTitle.textContent = 'Exploración terminada'; ui.badge.className = 'badge bad'; ui.badge.textContent = 'Sin solución';
   }
   let html = metric('Celdas expandidas', result.expandidas);
+  html += metric('Celdas visitadas', result.celdas_visitadas);
   if (isDFS) {
-    html += metric('Celdas visitadas', result.celdas_visitadas) + metric('Podas', result.podas) + metric('Retrocesos', result.retrocesos);
+    html += metric('Podas', result.podas) + metric('Retrocesos', result.retrocesos);
   } else {
-    html += metric('Celdas visitadas', result.celdas_visitadas) + metric('Movimientos', result.movimientos) + metric('Replanificaciones', result.replanificaciones);
+    html += metric('Pasos evaluados', result.pasos);
   }
   if (result.longitud_ruta) html += metric('Longitud de la ruta', result.longitud_ruta);
   ui.metrics.innerHTML = html;

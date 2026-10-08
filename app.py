@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import streamlit as st
 
-from laberinto import AgenteDFS, AgenteExploradorFronteras, Entorno, crear_laberinto
+from laberinto import AgenteDFS, AgenteAStar, Entorno, crear_laberinto
 from laberinto.interfaz_canvas import mostrar_animacion, preparar_animacion
 
 DFS = "DFS determinista"
-FRONTERAS = "Exploración por fronteras"
+A_STAR = "A* no determinista"
 COMPARAR = "Comparar ambos"
 
 st.set_page_config(page_title="Agentes en un laberinto", page_icon="🧭", layout="wide")
@@ -36,7 +36,7 @@ def generar(filas: int, columnas: int, semilla: int) -> None:
 
 def ejecutar(nombre: str, semilla: int, limite: int) -> None:
     estado = st.session_state.ejecucion
-    seleccionados = (DFS, FRONTERAS) if nombre == COMPARAR else (nombre,)
+    seleccionados = (DFS, A_STAR) if nombre == COMPARAR else (nombre,)
     ejecuciones = []
 
     for seleccionado in seleccionados:
@@ -44,8 +44,8 @@ def ejecutar(nombre: str, semilla: int, limite: int) -> None:
         agente = (
             AgenteDFS(entorno, max_pasos=limite)
             if seleccionado == DFS
-            else AgenteExploradorFronteras(
-                entorno, max_movimientos=limite, semilla=semilla
+            else AgenteAStar(
+                entorno, salida=estado["salida"], max_pasos=limite, semilla=semilla
             )
         )
         informe, eventos = agente.ejecutar()
@@ -58,8 +58,7 @@ def ejecutar(nombre: str, semilla: int, limite: int) -> None:
 
 st.title("🧭 Agentes inteligentes en un laberinto")
 st.write(
-    "Compara una búsqueda DFS determinista con un agente que explora fronteras "
-    "sin conocer las dimensiones ni la ubicación de la salida."
+    "Compara una búsqueda DFS determinista exhaustiva con un algoritmo A* heuristico que evalúa la ruta óptima de manera no determinista."
 )
 
 with st.sidebar:
@@ -67,7 +66,7 @@ with st.sidebar:
     filas = st.slider("Filas", 2, 30, 15)
     columnas = st.slider("Columnas", 2, 30, 15)
     semilla = st.number_input("Semilla", min_value=0, value=26, step=1)
-    algoritmo = st.selectbox("Algoritmo", (DFS, FRONTERAS, COMPARAR))
+    algoritmo = st.selectbox("Algoritmo", (DFS, A_STAR, COMPARAR))
     limite = st.number_input(
         "Límite de pasos o movimientos", min_value=1, value=100_000, step=1_000
     )
@@ -125,8 +124,7 @@ else:
 
     st.subheader("Resumen de resultados")
     st.caption(
-        "Las expansiones representan nodos DFS en el primer agente y nodos "
-        "procesados por A* durante las replanificaciones del explorador."
+        "Las expansiones representan nodos procesados por los algoritmos."
     )
     resumen = []
     for ejecucion in ejecuciones:
@@ -135,13 +133,13 @@ else:
             {
                 "Algoritmo": ejecucion["algoritmo"],
                 "Solución": "Sí" if informe["tiene_solucion"] else "No",
+                "Rutas encontradas": informe.get("total_caminos", 0),
                 "Longitud de ruta": len(informe.get("camino") or []),
                 "Celdas observadas": informe.get("celdas_visitadas", 0),
-                "Expansiones internas": informe["expandidas"],
-                "Eventos animados": len(ejecucion["eventos"]),
-                "Movimientos": informe.get("movimientos", "—"),
+                "Expansiones internas": informe.get("expandidas", 0),
+                "Movimientos": informe.get("pasos", "—"),
                 "Podas": informe.get("podas", "—"),
-                "Replanificaciones": informe.get("replanificaciones", "—"),
+                "Retrocesos": informe.get("retrocesos", "—"),
             }
         )
     st.dataframe(resumen, hide_index=True, use_container_width=True)

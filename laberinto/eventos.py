@@ -12,7 +12,5 @@ class Evento:
     tipo: str
     posicion: Posicion | None = None
     visitadas: frozenset[Posicion] = frozenset()
-    fronteras: frozenset[Posicion] = frozenset()
     ruta: tuple[Posicion, ...] = ()
-    trayectoria: tuple[Posicion, ...] = ()
     mensaje: str = ""

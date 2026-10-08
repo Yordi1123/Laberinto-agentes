@@ -17,7 +17,6 @@ COLORES = {
     "desconocida": "#263238",
     "libre": "#ffffff",
     "visitada": "#b3e5fc",
-    "frontera": "#ffd166",
     "ruta": "#c4b5fd",
     "agente": "#ef476f",
 }
@@ -35,9 +34,8 @@ def dibujar_laberinto(
     filas, columnas = len(laberinto), len(laberinto[0])
     ocultar_exploracion = bool(solo_ruta and evento and evento.ruta)
     visitadas = set(evento.visitadas) if evento and not ocultar_exploracion else set()
-    fronteras = set(evento.fronteras) if evento and not ocultar_exploracion else set()
     ruta = set(evento.ruta) if evento else set()
-    conocidas = visitadas | fronteras | ruta | {entrada}
+    conocidas = visitadas | ruta | {entrada}
     salida_visible = not vista_agente or (
         evento is not None and evento.tipo == "salida" and evento.posicion == salida
     )
@@ -57,8 +55,6 @@ def dibujar_laberinto(
                 color = COLORES["desconocida"]
             elif posicion in visitadas:
                 color = COLORES["visitada"]
-            if posicion in fronteras:
-                color = COLORES["frontera"]
             if posicion in ruta:
                 color = COLORES["ruta"]
             if evento and posicion == evento.posicion:

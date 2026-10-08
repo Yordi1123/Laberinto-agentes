@@ -22,7 +22,7 @@ def test_aplicacion_carga_laberinto_y_controles():
 
     app.slider[0].set_value(2)
     app.slider[1].set_value(2)
-    app.selectbox[0].select("Exploración por fronteras")
+    app.selectbox[0].select("A* no determinista")
     _boton(app, "Generar laberinto").click().run()
     _boton(app, "Ejecutar algoritmo").click().run()
 
@@ -65,5 +65,4 @@ def test_figura_final_oculta_marcas_ajenas_al_camino_minimo():
     colores = {to_hex(parche.get_facecolor()) for parche in figura.axes[0].patches}
     assert figura.axes[0].get_title() == "Camino mínimo"
     assert COLORES["visitada"] not in colores
-    assert COLORES["frontera"] not in colores
     plt.close(figura)

@@ -1,6 +1,6 @@
 from laberinto import (
     AgenteDFS,
-    AgenteExploradorFronteras,
+    AgenteAStar,
     Entorno,
     crear_laberinto,
 )
@@ -9,8 +9,8 @@ from laberinto.interfaz_canvas import crear_html_animacion, preparar_animacion
 
 def test_prepara_eventos_compactos_para_canvas():
     laberinto, entrada, salida = crear_laberinto(8, 9, semilla=26)
-    informe, eventos = AgenteExploradorFronteras(
-        Entorno(laberinto), semilla=26
+    informe, eventos = AgenteAStar(
+        Entorno(laberinto), salida=salida, semilla=26
     ).ejecutar()
 
     datos = preparar_animacion(
@@ -19,7 +19,7 @@ def test_prepara_eventos_compactos_para_canvas():
         salida,
         eventos,
         informe,
-        "Exploración por fronteras",
+        "A* no determinista",
         vista_agente=False,
     )
 
