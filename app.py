@@ -137,9 +137,9 @@ else:
                 "Longitud de ruta": len(informe.get("camino") or []),
                 "Celdas observadas": informe.get("celdas_visitadas", 0),
                 "Expansiones internas": informe.get("expandidas", 0),
-                "Movimientos": informe.get("pasos", "—"),
-                "Podas": informe.get("podas", "—"),
-                "Retrocesos": informe.get("retrocesos", "—"),
+                "Movimientos": informe.get("pasos", None),
+                "Podas": informe.get("podas", None),
+                "Retrocesos": informe.get("retrocesos", None),
             }
         )
     st.dataframe(resumen, hide_index=True, use_container_width=True)
