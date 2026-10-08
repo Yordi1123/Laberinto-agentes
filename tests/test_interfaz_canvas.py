@@ -1,5 +1,5 @@
 from laberinto import (
-    AgenteBusquedaDeterminista,
+    AgenteDFS,
     AgenteExploradorFronteras,
     Entorno,
     crear_laberinto,
@@ -48,14 +48,14 @@ def test_html_anima_en_el_navegador():
 
 def test_estado_final_contiene_unicamente_la_ruta_minima():
     laberinto, entrada, salida = crear_laberinto(10, 10, semilla=1)
-    informe, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+    informe, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
     datos = preparar_animacion(
         laberinto,
         entrada,
         salida,
         eventos,
         informe,
-        "Búsqueda determinista (BFS)",
+        "DFS determinista",
         vista_agente=False,
     )
 

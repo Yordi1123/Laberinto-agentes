@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from laberinto import AgenteBusquedaDeterminista, Entorno, crear_laberinto
+from laberinto import AgenteDFS, Entorno, crear_laberinto
 from laberinto.visualizacion import COLORES, dibujar_laberinto
 from matplotlib.colors import to_hex
 import matplotlib.pyplot as plt
@@ -27,8 +27,20 @@ def test_aplicacion_carga_laberinto_y_controles():
     _boton(app, "Ejecutar algoritmo").click().run()
 
     assert not app.exception
-    assert app.session_state.ejecucion["eventos"]
+    assert app.session_state.ejecucion["ejecuciones"][0]["eventos"]
     assert len(app.get("iframe")) == 1
+
+    app.selectbox[0].select("Comparar ambos").run()
+    _boton(app, "Ejecutar comparación").click().run()
+
+    assert not app.exception
+    assert len(app.session_state.ejecucion["ejecuciones"]) == 2
+    assert len(app.get("iframe")) == 2
+    assert len(app.dataframe) == 1
+    assert all(
+        '"modoComparacion":true' in iframe.proto.srcdoc
+        for iframe in app.get("iframe")
+    )
 
 
 def test_figura_limita_su_tamano_y_muestra_entrada_y_salida():
@@ -45,7 +57,7 @@ def test_figura_limita_su_tamano_y_muestra_entrada_y_salida():
 
 def test_figura_final_oculta_marcas_ajenas_al_camino_minimo():
     laberinto, entrada, salida = crear_laberinto(10, 10, semilla=1)
-    _, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+    _, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
     figura = dibujar_laberinto(
         laberinto, entrada, salida, eventos[-1], solo_ruta=True
     )

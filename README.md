@@ -2,7 +2,7 @@
 
 Proyecto académico para comparar dos estrategias de búsqueda sobre laberintos aleatorios:
 
-- **Búsqueda determinista (BFS):** encuentra un camino mínimo sin expandir una celda más de una vez.
+- **DFS determinista:** usa backtracking y poda rutas redundantes para conservar el mejor camino encontrado.
 - **Exploración por fronteras:** construye un mapa con percepción local y usa A* únicamente para desplazarse hacia una frontera conocida.
 
 El generador utiliza **Kruskal aleatorio** y Union-Find para construir entre uno y tres componentes. La entrada y la salida se agregan después, por lo que el generador no determina si existe solución.
@@ -19,7 +19,8 @@ La aplicación permite:
 - Regular la velocidad de reproducción entre 1 y 30 eventos por segundo.
 - Alternar con la vista parcial que representa el conocimiento real del agente.
 - Comparar longitud de ruta, celdas expandidas, movimientos y replanificaciones.
-- Mostrar únicamente el camino mínimo cuando termina la búsqueda determinista.
+- Ejecutar ambos algoritmos en paralelo sobre el mismo laberinto.
+- Mostrar únicamente el mejor camino cuando termina la búsqueda determinista.
 
 La animación utiliza **Canvas y JavaScript** dentro del navegador. Python envía el
 laberinto y una secuencia compacta de eventos una sola vez; después el agente se
@@ -48,7 +49,7 @@ source .venv/bin/activate
 │   ├── modelo.py                  # Celdas, paredes y direcciones
 │   ├── generador.py               # Kruskal y Union-Find
 │   ├── entorno.py                 # Percepción local
-│   ├── agentes.py                 # BFS determinista y exploración por fronteras
+│   ├── agentes.py                 # DFS con poda y exploración por fronteras
 │   ├── eventos.py                 # Instantáneas para la interfaz
 │   ├── interfaz_canvas.py         # Reproductor animado en el navegador
 │   └── visualizacion.py           # Renderizado con Matplotlib
@@ -85,7 +86,7 @@ Las pruebas verifican:
 - Reproducibilidad mediante semillas.
 - Coincidencia de los agentes sobre la existencia de solución.
 - Validez de los caminos encontrados.
-- Optimalidad del camino devuelto por BFS y ausencia de expansiones repetidas.
+- Optimalidad del camino devuelto por DFS y poda de rutas redundantes.
 - Eventos reproducibles y truncamiento seguro.
 
 ## Modelo de información
@@ -98,9 +99,9 @@ El agente de fronteras no recibe las dimensiones ni la posición de la salida. S
 
 La distancia Manhattan se utiliza exclusivamente cuando A* navega hacia una frontera ya descubierta. No se emplea como estimación de la salida desconocida.
 
-BFS se presenta como una búsqueda sobre el grafo: la marca roja indica la celda que
-se está expandiendo y no un desplazamiento físico entre elementos de la cola. En
-cambio, el explorador por fronteras sí registra todos sus movimientos reales.
+DFS evita ciclos, descarta llegadas a una celda con una profundidad igual o mayor
+y abandona ramas que ya no pueden mejorar la mejor solución. El agente conserva
+el avance y el retroceso característicos de una búsqueda en profundidad.
 
 ## Publicación
 

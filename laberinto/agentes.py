@@ -1,10 +1,9 @@
-"""Búsqueda BFS determinista y exploración estocástica por fronteras."""
+"""Búsqueda DFS determinista y exploración estocástica por fronteras."""
 
 from __future__ import annotations
 
 import heapq
 import random
-from collections import deque
 from typing import Any
 
 from .entorno import Entorno
@@ -14,8 +13,8 @@ from .modelo import Posicion, SUPERIOR
 Informe = dict[str, Any]
 
 
-class AgenteBusquedaDeterminista:
-    """Encuentra un camino mínimo mediante búsqueda en anchura (BFS)."""
+class AgenteDFS:
+    """Busca la ruta más corta mediante DFS con poda de ramas redundantes."""
 
     def __init__(self, entorno: Entorno, max_pasos: int = 5_000_000) -> None:
         if type(max_pasos) is not int or max_pasos <= 0:
@@ -27,11 +26,11 @@ class AgenteBusquedaDeterminista:
     def _reiniciar(self, registrar_eventos: bool) -> None:
         self.entrada: Posicion | None = None
         self.salida: tuple[Posicion, int] | None = None
-        self.camino: list[Posicion] | None = None
+        self.mejor_camino: list[Posicion] | None = None
         self.exploradas: set[Posicion] = set()
-        self.descubiertas: set[Posicion] = set()
-        self.padres: dict[Posicion, Posicion | None] = {}
-        self.pasos = self.expandidas = 0
+        self.mejor_profundidad: dict[Posicion, int] = {}
+        self.pasos = self.expandidas = self.retrocesos = self.podas = 0
+        self.soluciones_evaluadas = 0
         self.truncado = False
         self.motivo_truncado: str | None = None
         self._registrar_eventos = registrar_eventos
@@ -49,7 +48,6 @@ class AgenteBusquedaDeterminista:
         tipo: str,
         posicion: Posicion | None,
         ruta: list[Posicion],
-        fronteras: deque[Posicion],
         mensaje: str,
     ) -> None:
         if self._registrar_eventos:
@@ -58,7 +56,6 @@ class AgenteBusquedaDeterminista:
                     tipo=tipo,
                     posicion=posicion,
                     visitadas=frozenset(self.exploradas),
-                    fronteras=frozenset(fronteras),
                     ruta=tuple(ruta),
                     mensaje=mensaje,
                 )
@@ -71,94 +68,105 @@ class AgenteBusquedaDeterminista:
             return self._informe()
 
         self.entrada = entradas[0]
-        frontera = deque([self.entrada])
-        self.descubiertas.add(self.entrada)
-        self.padres[self.entrada] = None
+        ruta = [self.entrada]
+        en_ruta = {self.entrada}
+        pila = [iter(self.entorno.percibir(self.entrada))]
+        self.exploradas.add(self.entrada)
+        self.mejor_profundidad[self.entrada] = 1
+        self.expandidas = 1
         self._emitir(
-            "inicio",
-            self.entrada,
-            [self.entrada],
-            frontera,
-            "Inicio de la búsqueda en anchura",
+            "inicio", self.entrada, ruta, "Inicio de la búsqueda DFS con poda"
         )
 
-        while frontera:
-            if self.expandidas >= self.max_pasos:
+        while pila:
+            if self.pasos >= self.max_pasos:
                 self.truncado = True
-                self.motivo_truncado = "límite de expansiones alcanzado"
-                posicion = frontera[0]
-                self._emitir(
-                    "truncado",
-                    posicion,
-                    self._reconstruir(posicion),
-                    frontera,
-                    self.motivo_truncado,
-                )
+                self.motivo_truncado = "límite de pasos alcanzado"
+                self._emitir("truncado", ruta[-1], ruta, self.motivo_truncado)
                 break
 
-            posicion = frontera.popleft()
-            self.exploradas.add(posicion)
-            self.expandidas += 1
-            self.pasos = self.expandidas
-            ruta = self._reconstruir(posicion)
+            # Ninguna extensión puede mejorar una solución de igual longitud.
+            if self.mejor_camino and len(ruta) >= len(self.mejor_camino):
+                self.podas += 1
+                pila.pop()
+                anterior = ruta.pop()
+                en_ruta.remove(anterior)
+                self.retrocesos += 1
+                posicion = ruta[-1] if ruta else None
+                self._emitir("retroceder", posicion, ruta, "Poda por longitud")
+                continue
 
-            for direccion, tipo, destino in self.entorno.percibir(posicion):
-                if tipo == "borde":
-                    if posicion == self.entrada and direccion == SUPERIOR:
-                        continue
-                    self.salida = (posicion, direccion)
-                    self.camino = ruta
+            try:
+                direccion, tipo, destino = next(pila[-1])
+                self.pasos += 1
+            except StopIteration:
+                pila.pop()
+                anterior = ruta.pop()
+                en_ruta.remove(anterior)
+                self.retrocesos += 1
+                posicion = ruta[-1] if ruta else None
+                self._emitir("retroceder", posicion, ruta, "Retroceso por backtracking")
+                continue
+
+            if tipo == "borde":
+                if ruta[-1] == self.entrada and direccion == SUPERIOR:
+                    continue
+                self.soluciones_evaluadas += 1
+                if self.mejor_camino is None or len(ruta) < len(self.mejor_camino):
+                    self.salida = (ruta[-1], direccion)
+                    self.mejor_camino = list(ruta)
                     self._emitir(
                         "salida",
-                        posicion,
+                        ruta[-1],
                         ruta,
-                        frontera,
-                        "Salida encontrada por el camino más corto",
+                        "Nueva mejor salida encontrada",
                     )
-                    return self._informe()
+                continue
 
-                assert destino is not None
-                if destino not in self.descubiertas:
-                    self.descubiertas.add(destino)
-                    self.padres[destino] = posicion
-                    frontera.append(destino)
+            assert destino is not None
+            profundidad = len(ruta) + 1
+            redundante = destino in en_ruta or profundidad >= self.mejor_profundidad.get(
+                destino, float("inf")
+            )
+            if redundante:
+                self.podas += 1
+                continue
 
+            self.mejor_profundidad[destino] = profundidad
+            ruta.append(destino)
+            en_ruta.add(destino)
+            self.exploradas.add(destino)
+            pila.append(iter(self.entorno.percibir(destino)))
+            self.expandidas += 1
             self._emitir(
-                "expandir",
-                posicion,
-                ruta,
-                frontera,
-                "Celda expandida; nuevas vecinas agregadas a la frontera",
+                "avanzar", destino, ruta, "Avance a una ruta potencialmente mejor"
             )
 
         if not self.truncado:
+            posicion = self.mejor_camino[-1] if self.mejor_camino else None
+            mensaje = (
+                "Mejor camino confirmado"
+                if self.mejor_camino
+                else "No se encontró una salida accesible"
+            )
             self._emitir(
-                "sin_solucion",
-                None,
-                [],
-                frontera,
-                "Se agotaron todas las celdas accesibles",
+                "final", posicion, self.mejor_camino or [], mensaje
             )
         return self._informe()
 
-    def _reconstruir(self, posicion: Posicion) -> list[Posicion]:
-        camino = []
-        actual: Posicion | None = posicion
-        while actual is not None:
-            camino.append(actual)
-            actual = self.padres[actual]
-        return camino[::-1]
-
     def _informe(self) -> Informe:
         return {
-            "algoritmo": "Búsqueda determinista (BFS)",
+            "algoritmo": "DFS determinista",
             "entrada": self.entrada,
             "salida": self.salida,
-            "camino": self.camino,
-            "tiene_solucion": self.salida is not None,
+            "camino": self.mejor_camino,
+            "tiene_solucion": self.mejor_camino is not None,
             "pasos": self.pasos,
             "expandidas": self.expandidas,
-            "celdas_descubiertas": len(self.descubiertas),
+            "celdas_visitadas": len(self.exploradas),
+            "soluciones_evaluadas": self.soluciones_evaluadas,
+            "retrocesos": self.retrocesos,
+            "podas": self.podas,
             "truncado": self.truncado,
             "motivo_truncado": self.motivo_truncado,
         }

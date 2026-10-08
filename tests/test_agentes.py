@@ -5,7 +5,7 @@ from collections import deque
 import pytest
 
 from laberinto import (
-    AgenteBusquedaDeterminista,
+    AgenteDFS,
     AgenteExploradorFronteras,
     DIRECCIONES,
     Entorno,
@@ -54,33 +54,33 @@ def test_agentes_coinciden_sobre_existencia_de_solucion(semilla):
     laberinto, entrada, salida = crear_laberinto(12, 12, semilla)
     esperado = existe_solucion(laberinto, entrada)
 
-    determinista = AgenteBusquedaDeterminista(Entorno(laberinto)).resolver()
+    dfs = AgenteDFS(Entorno(laberinto)).resolver()
     fronteras = AgenteExploradorFronteras(
         Entorno(laberinto), semilla=semilla
     ).resolver()
 
-    assert determinista["tiene_solucion"] == esperado
+    assert dfs["tiene_solucion"] == esperado
     assert fronteras["tiene_solucion"] == esperado
     if esperado:
-        assert determinista["camino"][0] == entrada
-        assert determinista["camino"][-1] == salida
+        assert dfs["camino"][0] == entrada
+        assert dfs["camino"][-1] == salida
         assert fronteras["camino"][0] == entrada and fronteras["camino"][-1] == salida
-        assert ruta_valida(laberinto, determinista["camino"])
+        assert ruta_valida(laberinto, dfs["camino"])
         assert ruta_valida(laberinto, fronteras["camino"])
 
 
 @pytest.mark.parametrize("semilla", range(20))
-def test_busqueda_determinista_no_repite_celdas_y_devuelve_ruta_minima(semilla):
+def test_dfs_poda_rutas_redundantes_y_devuelve_ruta_minima(semilla):
     laberinto, entrada, _ = crear_laberinto(12, 12, semilla)
-    informe, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+    informe, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
 
-    expandidas = [
-        evento.posicion
-        for evento in eventos
-        if evento.tipo in {"expandir", "salida"}
-    ]
-    assert len(expandidas) == len(set(expandidas))
-    assert informe["expandidas"] == len(expandidas)
+    mejor_profundidad = {}
+    expansiones = [e for e in eventos if e.tipo in {"inicio", "avanzar"}]
+    for evento in expansiones:
+        profundidad = len(evento.ruta)
+        assert profundidad < mejor_profundidad.get(evento.posicion, float("inf"))
+        mejor_profundidad[evento.posicion] = profundidad
+    assert informe["expandidas"] == len(expansiones)
 
     if informe["tiene_solucion"]:
         distancias = {entrada: 1}
@@ -100,6 +100,16 @@ def test_busqueda_determinista_no_repite_celdas_y_devuelve_ruta_minima(semilla):
                     cola.append(destino)
         assert len(informe["camino"]) == longitud_minima
         assert eventos[-1].ruta == tuple(informe["camino"])
+
+
+def test_dfs_registra_podas_y_conserva_el_mejor_camino_al_final():
+    laberinto, _, _ = crear_laberinto(15, 15, semilla=26)
+    informe, eventos = AgenteDFS(Entorno(laberinto)).ejecutar()
+
+    assert informe["podas"] > 0
+    assert informe["expandidas"] < informe["pasos"]
+    assert eventos[-1].tipo == "final"
+    assert eventos[-1].ruta == tuple(informe["camino"])
 
 
 def test_ejecucion_genera_eventos_reproducibles():

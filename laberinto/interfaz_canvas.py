@@ -21,6 +21,7 @@ def preparar_animacion(
     informe: dict[str, Any] | None,
     algoritmo: str | None,
     vista_agente: bool,
+    modo_comparacion: bool = False,
 ) -> dict[str, Any]:
     """Convierte objetos Python a una carga compacta para el navegador."""
     indices = _seleccionar_indices(eventos)
@@ -55,6 +56,7 @@ def preparar_animacion(
         "totalEventos": len(eventos),
         "algoritmo": algoritmo,
         "vistaAgente": vista_agente,
+        "modoComparacion": modo_comparacion,
         "resultado": _resumir_informe(informe),
     }
 
@@ -112,10 +114,12 @@ def _resumir_informe(informe: dict[str, Any] | None) -> dict[str, Any] | None:
         "tiene_solucion",
         "expandidas",
         "pasos",
-        "celdas_descubiertas",
         "celdas_visitadas",
+        "soluciones_evaluadas",
         "movimientos",
         "replanificaciones",
+        "retrocesos",
+        "podas",
     )
     resumen = {clave: informe.get(clave) for clave in claves if clave in informe}
     resumen["longitud_ruta"] = len(camino) if camino else 0
@@ -178,6 +182,14 @@ _PLANTILLA = r"""<!doctype html>
     .side { border-left: 0; border-top: 1px solid var(--line); }
     .canvas-wrap { height: 420px; }
   }
+  body.comparison .toolbar { grid-template-columns: auto minmax(130px, 1fr); }
+  body.comparison .speed { grid-column: 1 / -1; width: 100%; display: grid; grid-template-columns: 95px 1fr; gap: 10px; align-items: center; }
+  body.comparison .content { grid-template-columns: 1fr; }
+  body.comparison .canvas-wrap { height: 350px; }
+  body.comparison .side { padding: 14px; border-left: 0; border-top: 1px solid var(--line); }
+  body.comparison .message { min-height: 0; margin-bottom: 10px; }
+  body.comparison .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.comparison .metric strong { font-size: 16px; }
 </style>
 </head>
 <body>
@@ -225,13 +237,14 @@ _PLANTILLA = r"""<!doctype html>
 const DATA = __DATOS_ANIMACION__;
 const COLORS = {free:'#ffffff', unknown:'#263238', visited:'#b9e5f7', frontier:'#ffd166', route:'#c9b8ff', wall:'#172033', agent:'#ef476f'};
 const events = DATA.eventos;
-const isDeterministic = DATA.algoritmo === 'Búsqueda determinista (BFS)';
+const isDFS = DATA.algoritmo === 'DFS determinista';
 const canvas = document.getElementById('maze');
 const wrap = document.getElementById('canvasWrap');
 const ctx = canvas.getContext('2d');
 const ui = Object.fromEntries(['play','restart','prev','next','seek','counter','eventType','speed','speedValue','progressBar','statusTitle','message','badge','metrics','sampling','markerLabel','eyebrow'].map(id => [id, document.getElementById(id)]));
-ui.markerLabel.textContent = isDeterministic ? 'Celda expandida' : 'Agente';
-ui.eyebrow.textContent = isDeterministic ? 'Estado de la búsqueda' : 'Estado del agente';
+document.body.classList.toggle('comparison', DATA.modoComparacion);
+ui.markerLabel.textContent = 'Agente';
+ui.eyebrow.textContent = 'Estado del agente';
 let width = 0, height = 0, cell = 1, offsetX = 0, offsetY = 0;
 let index = 0, playing = events.length > 1, speed = 8, transitionStart = null, frameRequest = null;
 let visited = new Set(), exitFound = false;
@@ -352,7 +365,7 @@ function updateUI() {
   } else if (index < events.length - 1) {
     ui.statusTitle.textContent = event.t === 'salida' ? 'Salida detectada' : 'Exploración en curso';
     ui.message.textContent = event.m;
-    ui.metrics.innerHTML = isDeterministic
+    ui.metrics.innerHTML = isDFS
       ? metric('Celdas observadas', visited.size) + metric('Longitud de la ruta actual', event.r.length)
       : metric('Celdas observadas', visited.size) + metric('Fronteras activas', event.f.length) + metric('Movimientos', event.mv);
   } else {
@@ -374,8 +387,8 @@ function showResult(event) {
     ui.statusTitle.textContent = 'Exploración terminada'; ui.badge.className = 'badge bad'; ui.badge.textContent = 'Sin solución';
   }
   let html = metric('Celdas expandidas', result.expandidas);
-  if (isDeterministic) {
-    html += metric('Celdas descubiertas', result.celdas_descubiertas);
+  if (isDFS) {
+    html += metric('Celdas visitadas', result.celdas_visitadas) + metric('Podas', result.podas) + metric('Retrocesos', result.retrocesos);
   } else {
     html += metric('Celdas visitadas', result.celdas_visitadas) + metric('Movimientos', result.movimientos) + metric('Replanificaciones', result.replanificaciones);
   }
