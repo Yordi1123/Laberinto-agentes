@@ -1,2 +1,2 @@
 matplotlib>=3.7,<4
-streamlit>=1.37,<2
+streamlit>=1.56,<2

@@ -16,9 +16,14 @@ La aplicación permite:
 - Elegir el algoritmo.
 - Observar el laberinto completo desde la vista del espectador.
 - Reproducir, pausar, reiniciar o recorrer paso a paso la búsqueda animada.
-- Regular la velocidad de reproducción entre 1 y 20 fotogramas por segundo.
+- Regular la velocidad de reproducción entre 1 y 30 eventos por segundo.
 - Alternar con la vista parcial que representa el conocimiento real del agente.
 - Comparar caminos, movimientos, expansiones, retrocesos y replanificaciones.
+
+La animación utiliza **Canvas y JavaScript** dentro del navegador. Python envía el
+laberinto y una secuencia compacta de eventos una sola vez; después el agente se
+mueve con interpolación mediante `requestAnimationFrame`, sin generar una imagen
+Matplotlib nueva en cada fotograma.
 
 ```powershell
 python -m venv .venv
@@ -44,6 +49,7 @@ source .venv/bin/activate
 │   ├── entorno.py                 # Percepción local
 │   ├── agentes.py                 # DFS y exploración por fronteras
 │   ├── eventos.py                 # Instantáneas para la interfaz
+│   ├── interfaz_canvas.py         # Reproductor animado en el navegador
 │   └── visualizacion.py           # Renderizado con Matplotlib
 ├── notebooks/
 │   ├── Reto_Laberinto.ipynb       # Presentación y experimentos

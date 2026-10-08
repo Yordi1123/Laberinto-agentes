@@ -16,8 +16,18 @@ def test_aplicacion_carga_laberinto_y_controles():
     assert not app.exception
     assert app.radio[0].value == "Vista del espectador"
     assert not _boton(app, "Ejecutar algoritmo").disabled
-    assert any(control.label == "Velocidad de animación" for control in app.slider)
-    assert any("Laberinto listo" in mensaje.value for mensaje in app.info)
+    assert len(app.get("iframe")) == 1
+    assert "requestAnimationFrame" in app.get("iframe")[0].proto.srcdoc
+
+    app.slider[0].set_value(2)
+    app.slider[1].set_value(2)
+    app.selectbox[0].select("Exploración por fronteras")
+    _boton(app, "Generar laberinto").click().run()
+    _boton(app, "Ejecutar algoritmo").click().run()
+
+    assert not app.exception
+    assert app.session_state.ejecucion["eventos"]
+    assert len(app.get("iframe")) == 1
 
 
 def test_figura_limita_su_tamano_y_muestra_entrada_y_salida():
