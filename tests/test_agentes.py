@@ -5,7 +5,7 @@ from collections import deque
 import pytest
 
 from laberinto import (
-    AgenteDFS,
+    AgenteBusquedaDeterminista,
     AgenteExploradorFronteras,
     DIRECCIONES,
     Entorno,
@@ -54,18 +54,52 @@ def test_agentes_coinciden_sobre_existencia_de_solucion(semilla):
     laberinto, entrada, salida = crear_laberinto(12, 12, semilla)
     esperado = existe_solucion(laberinto, entrada)
 
-    dfs = AgenteDFS(Entorno(laberinto)).resolver()
+    determinista = AgenteBusquedaDeterminista(Entorno(laberinto)).resolver()
     fronteras = AgenteExploradorFronteras(
         Entorno(laberinto), semilla=semilla
     ).resolver()
 
-    assert dfs["tiene_solucion"] == esperado
+    assert determinista["tiene_solucion"] == esperado
     assert fronteras["tiene_solucion"] == esperado
     if esperado:
-        assert dfs["camino"][0] == entrada and dfs["camino"][-1] == salida
+        assert determinista["camino"][0] == entrada
+        assert determinista["camino"][-1] == salida
         assert fronteras["camino"][0] == entrada and fronteras["camino"][-1] == salida
-        assert ruta_valida(laberinto, dfs["camino"])
+        assert ruta_valida(laberinto, determinista["camino"])
         assert ruta_valida(laberinto, fronteras["camino"])
+
+
+@pytest.mark.parametrize("semilla", range(20))
+def test_busqueda_determinista_no_repite_celdas_y_devuelve_ruta_minima(semilla):
+    laberinto, entrada, _ = crear_laberinto(12, 12, semilla)
+    informe, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+
+    expandidas = [
+        evento.posicion
+        for evento in eventos
+        if evento.tipo in {"expandir", "salida"}
+    ]
+    assert len(expandidas) == len(set(expandidas))
+    assert informe["expandidas"] == len(expandidas)
+
+    if informe["tiene_solucion"]:
+        distancias = {entrada: 1}
+        cola = deque([entrada])
+        longitud_minima = None
+        entorno = Entorno(laberinto)
+        while cola and longitud_minima is None:
+            posicion = cola.popleft()
+            for direccion, tipo, destino in entorno.percibir(posicion):
+                if tipo == "borde" and not (
+                    posicion == entrada and direccion == 0
+                ):
+                    longitud_minima = distancias[posicion]
+                    break
+                if tipo != "borde" and destino not in distancias:
+                    distancias[destino] = distancias[posicion] + 1
+                    cola.append(destino)
+        assert len(informe["camino"]) == longitud_minima
+        assert eventos[-1].ruta == tuple(informe["camino"])
 
 
 def test_ejecucion_genera_eventos_reproducibles():

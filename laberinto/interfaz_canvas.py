@@ -111,9 +111,8 @@ def _resumir_informe(informe: dict[str, Any] | None) -> dict[str, Any] | None:
         "motivo_truncado",
         "tiene_solucion",
         "expandidas",
-        "total_caminos",
-        "retrocesos",
         "pasos",
+        "celdas_descubiertas",
         "celdas_visitadas",
         "movimientos",
         "replanificaciones",
@@ -204,7 +203,7 @@ _PLANTILLA = r"""<!doctype html>
     <div class="maze-panel">
       <div class="canvas-wrap" id="canvasWrap"><canvas id="maze" aria-label="Animación del laberinto"></canvas></div>
       <div class="legend">
-        <span><i class="dot" style="background:#ef476f"></i>Agente</span>
+        <span><i class="dot" style="background:#ef476f"></i><span id="markerLabel">Agente</span></span>
         <span><i class="dot" style="background:#b9e5f7"></i>Visitadas</span>
         <span><i class="dot" style="background:#ffd166"></i>Fronteras</span>
         <span><i class="dot" style="background:#c9b8ff"></i>Ruta planificada</span>
@@ -212,7 +211,7 @@ _PLANTILLA = r"""<!doctype html>
       </div>
     </div>
     <aside class="side">
-      <p class="eyebrow">Estado del agente</p>
+      <p class="eyebrow" id="eyebrow">Estado del agente</p>
       <h3 id="statusTitle">Laberinto generado</h3>
       <p class="message" id="message">Ejecuta un algoritmo para comenzar la animación.</p>
       <div class="badge" id="badge"></div>
@@ -226,10 +225,13 @@ _PLANTILLA = r"""<!doctype html>
 const DATA = __DATOS_ANIMACION__;
 const COLORS = {free:'#ffffff', unknown:'#263238', visited:'#b9e5f7', frontier:'#ffd166', route:'#c9b8ff', wall:'#172033', agent:'#ef476f'};
 const events = DATA.eventos;
+const isDeterministic = DATA.algoritmo === 'Búsqueda determinista (BFS)';
 const canvas = document.getElementById('maze');
 const wrap = document.getElementById('canvasWrap');
 const ctx = canvas.getContext('2d');
-const ui = Object.fromEntries(['play','restart','prev','next','seek','counter','eventType','speed','speedValue','progressBar','statusTitle','message','badge','metrics','sampling'].map(id => [id, document.getElementById(id)]));
+const ui = Object.fromEntries(['play','restart','prev','next','seek','counter','eventType','speed','speedValue','progressBar','statusTitle','message','badge','metrics','sampling','markerLabel','eyebrow'].map(id => [id, document.getElementById(id)]));
+ui.markerLabel.textContent = isDeterministic ? 'Celda expandida' : 'Agente';
+ui.eyebrow.textContent = isDeterministic ? 'Estado de la búsqueda' : 'Estado del agente';
 let width = 0, height = 0, cell = 1, offsetX = 0, offsetY = 0;
 let index = 0, playing = events.length > 1, speed = 8, transitionStart = null, frameRequest = null;
 let visited = new Set(), exitFound = false;
@@ -268,20 +270,21 @@ function currentPosition() {
   return events.length && events[index].p ? position(events[index].p) : null;
 }
 
-function draw(agentPoint) {
+function draw(agentPoint, agentAlpha = 1) {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
   const event = events[index] || {f:[], r:[]};
   const frontiers = new Set(event.f.map(key));
   const route = new Set(event.r.map(key));
+  const bestPathOnly = Boolean(index === events.length - 1 && DATA.resultado?.tiene_solucion && route.size);
 
   for (let row = 0; row < DATA.filas; row++) {
     for (let col = 0; col < DATA.columnas; col++) {
       const id = `${row},${col}`;
       const known = visited.has(id) || frontiers.has(id) || id === key(DATA.entrada);
       let fill = DATA.vistaAgente && !known ? COLORS.unknown : COLORS.free;
-      if (known && visited.has(id)) fill = COLORS.visited;
-      if (frontiers.has(id)) fill = COLORS.frontier;
+      if (!bestPathOnly && known && visited.has(id)) fill = COLORS.visited;
+      if (!bestPathOnly && frontiers.has(id)) fill = COLORS.frontier;
       if (route.has(id)) fill = COLORS.route;
       ctx.fillStyle = fill;
       ctx.fillRect(offsetX + col * cell, offsetY + row * cell, cell + .35, cell + .35);
@@ -307,7 +310,7 @@ function draw(agentPoint) {
   ctx.stroke();
   drawLabel(DATA.entrada, 'S', '#0f766e');
   if (!DATA.vistaAgente || exitFound) drawLabel(DATA.salida, 'E', '#15803d');
-  if (agentPoint) drawAgent(agentPoint);
+  if (agentPoint) drawAgent(agentPoint, agentAlpha);
 }
 
 function drawLabel(p, label, color) {
@@ -316,9 +319,10 @@ function drawLabel(p, label, color) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(label, x, y);
 }
 
-function drawAgent(p) {
+function drawAgent(p, alpha = 1) {
   const radius = clamp(cell * .29, 4.5, 13);
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.shadowColor = 'rgba(239,71,111,.38)'; ctx.shadowBlur = radius * .9;
   ctx.fillStyle = COLORS.agent; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1.8, radius * .25), 0, Math.PI * 2); ctx.fill();
@@ -348,7 +352,7 @@ function updateUI() {
   } else if (index < events.length - 1) {
     ui.statusTitle.textContent = event.t === 'salida' ? 'Salida detectada' : 'Exploración en curso';
     ui.message.textContent = event.m;
-    ui.metrics.innerHTML = DATA.algoritmo === 'DFS determinista'
+    ui.metrics.innerHTML = isDeterministic
       ? metric('Celdas observadas', visited.size) + metric('Longitud de la ruta actual', event.r.length)
       : metric('Celdas observadas', visited.size) + metric('Fronteras activas', event.f.length) + metric('Movimientos', event.mv);
   } else {
@@ -370,8 +374,8 @@ function showResult(event) {
     ui.statusTitle.textContent = 'Exploración terminada'; ui.badge.className = 'badge bad'; ui.badge.textContent = 'Sin solución';
   }
   let html = metric('Celdas expandidas', result.expandidas);
-  if (DATA.algoritmo === 'DFS determinista') {
-    html += metric('Caminos encontrados', result.total_caminos) + metric('Retrocesos', result.retrocesos);
+  if (isDeterministic) {
+    html += metric('Celdas descubiertas', result.celdas_descubiertas);
   } else {
     html += metric('Celdas visitadas', result.celdas_visitadas) + metric('Movimientos', result.movimientos) + metric('Replanificaciones', result.replanificaciones);
   }
@@ -405,11 +409,19 @@ function animate(timestamp) {
   const progress = clamp((timestamp - transitionStart) / duration, 0, 1);
   const fromEvent = events[index], toEvent = events[index + 1];
   let agentPoint = fromEvent.p ? position(fromEvent.p) : null;
+  let agentAlpha = 1;
   if (fromEvent.p && toEvent.p) {
     const from = position(fromEvent.p), to = position(toEvent.p), amount = ease(progress);
-    agentPoint = {x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount};
+    const distance = Math.abs(fromEvent.p[0] - toEvent.p[0]) + Math.abs(fromEvent.p[1] - toEvent.p[1]);
+    if (distance <= 1) {
+      agentPoint = {x: from.x + (to.x - from.x) * amount, y: from.y + (to.y - from.y) * amount};
+    } else if (progress < .5) {
+      agentPoint = from; agentAlpha = 1 - progress * 2;
+    } else {
+      agentPoint = to; agentAlpha = (progress - .5) * 2;
+    }
   }
-  draw(agentPoint);
+  draw(agentPoint, agentAlpha);
   if (progress >= 1) {
     index += 1; applyEvent(events[index]); transitionStart = null; updateUI();
     if (index >= events.length - 1) { pause(); return; }

@@ -1,9 +1,10 @@
-"""Agente DFS y explorador estocástico por fronteras."""
+"""Búsqueda BFS determinista y exploración estocástica por fronteras."""
 
 from __future__ import annotations
 
 import heapq
 import random
+from collections import deque
 from typing import Any
 
 from .entorno import Entorno
@@ -13,8 +14,8 @@ from .modelo import Posicion, SUPERIOR
 Informe = dict[str, Any]
 
 
-class AgenteDFS:
-    """Enumera determinísticamente todos los caminos simples a una salida."""
+class AgenteBusquedaDeterminista:
+    """Encuentra un camino mínimo mediante búsqueda en anchura (BFS)."""
 
     def __init__(self, entorno: Entorno, max_pasos: int = 5_000_000) -> None:
         if type(max_pasos) is not int or max_pasos <= 0:
@@ -25,9 +26,12 @@ class AgenteDFS:
 
     def _reiniciar(self, registrar_eventos: bool) -> None:
         self.entrada: Posicion | None = None
-        self.salidas: dict[tuple[Posicion, int], list[list[Posicion]]] = {}
+        self.salida: tuple[Posicion, int] | None = None
+        self.camino: list[Posicion] | None = None
         self.exploradas: set[Posicion] = set()
-        self.pasos = self.expandidas = self.retrocesos = 0
+        self.descubiertas: set[Posicion] = set()
+        self.padres: dict[Posicion, Posicion | None] = {}
+        self.pasos = self.expandidas = 0
         self.truncado = False
         self.motivo_truncado: str | None = None
         self._registrar_eventos = registrar_eventos
@@ -41,7 +45,12 @@ class AgenteDFS:
         return informe, tuple(self.eventos)
 
     def _emitir(
-        self, tipo: str, posicion: Posicion | None, ruta: list[Posicion], mensaje: str
+        self,
+        tipo: str,
+        posicion: Posicion | None,
+        ruta: list[Posicion],
+        fronteras: deque[Posicion],
+        mensaje: str,
     ) -> None:
         if self._registrar_eventos:
             self.eventos.append(
@@ -49,6 +58,7 @@ class AgenteDFS:
                     tipo=tipo,
                     posicion=posicion,
                     visitadas=frozenset(self.exploradas),
+                    fronteras=frozenset(fronteras),
                     ruta=tuple(ruta),
                     mensaje=mensaje,
                 )
@@ -61,66 +71,97 @@ class AgenteDFS:
             return self._informe()
 
         self.entrada = entradas[0]
-        ruta = [self.entrada]
-        en_ruta = {self.entrada}
-        self.exploradas.add(self.entrada)
-        pila = [iter(self.entorno.percibir(self.entrada))]
-        self.expandidas = 1
-        self._emitir("inicio", self.entrada, ruta, "Inicio de la búsqueda DFS")
+        frontera = deque([self.entrada])
+        self.descubiertas.add(self.entrada)
+        self.padres[self.entrada] = None
+        self._emitir(
+            "inicio",
+            self.entrada,
+            [self.entrada],
+            frontera,
+            "Inicio de la búsqueda en anchura",
+        )
 
-        while pila:
-            if self.pasos >= self.max_pasos:
+        while frontera:
+            if self.expandidas >= self.max_pasos:
                 self.truncado = True
-                self.motivo_truncado = "límite de pasos alcanzado"
-                self._emitir("truncado", ruta[-1], ruta, self.motivo_truncado)
+                self.motivo_truncado = "límite de expansiones alcanzado"
+                posicion = frontera[0]
+                self._emitir(
+                    "truncado",
+                    posicion,
+                    self._reconstruir(posicion),
+                    frontera,
+                    self.motivo_truncado,
+                )
                 break
 
-            try:
-                direccion, tipo, destino = next(pila[-1])
-                self.pasos += 1
-            except StopIteration:
-                pila.pop()
-                anterior = ruta.pop()
-                en_ruta.remove(anterior)
-                self.retrocesos += 1
-                posicion = ruta[-1] if ruta else None
-                self._emitir("retroceder", posicion, ruta, "Retroceso por backtracking")
-                continue
+            posicion = frontera.popleft()
+            self.exploradas.add(posicion)
+            self.expandidas += 1
+            self.pasos = self.expandidas
+            ruta = self._reconstruir(posicion)
 
-            if tipo == "borde":
-                if not (ruta[-1] == self.entrada and direccion == SUPERIOR):
-                    clave = (ruta[-1], direccion)
-                    self.salidas.setdefault(clave, []).append(list(ruta))
-                    self._emitir("salida", ruta[-1], ruta, "Salida encontrada")
-            elif destino not in en_ruta:
-                ruta.append(destino)
-                en_ruta.add(destino)
-                self.exploradas.add(destino)
-                pila.append(iter(self.entorno.percibir(destino)))
-                self.expandidas += 1
-                self._emitir("avanzar", destino, ruta, "Avance a una celda no incluida en la ruta")
+            for direccion, tipo, destino in self.entorno.percibir(posicion):
+                if tipo == "borde":
+                    if posicion == self.entrada and direccion == SUPERIOR:
+                        continue
+                    self.salida = (posicion, direccion)
+                    self.camino = ruta
+                    self._emitir(
+                        "salida",
+                        posicion,
+                        ruta,
+                        frontera,
+                        "Salida encontrada por el camino más corto",
+                    )
+                    return self._informe()
+
+                assert destino is not None
+                if destino not in self.descubiertas:
+                    self.descubiertas.add(destino)
+                    self.padres[destino] = posicion
+                    frontera.append(destino)
+
+            self._emitir(
+                "expandir",
+                posicion,
+                ruta,
+                frontera,
+                "Celda expandida; nuevas vecinas agregadas a la frontera",
+            )
 
         if not self.truncado:
-            mensaje = "Exploración completa" if self.salidas else "No se encontró una salida"
-            self._emitir("final", self.entrada, [], mensaje)
+            self._emitir(
+                "sin_solucion",
+                None,
+                [],
+                frontera,
+                "Se agotaron todas las celdas accesibles",
+            )
         return self._informe()
 
+    def _reconstruir(self, posicion: Posicion) -> list[Posicion]:
+        camino = []
+        actual: Posicion | None = posicion
+        while actual is not None:
+            camino.append(actual)
+            actual = self.padres[actual]
+        return camino[::-1]
+
     def _informe(self) -> Informe:
-        caminos = [camino for grupo in self.salidas.values() for camino in grupo]
         return {
-            "algoritmo": "DFS determinista",
+            "algoritmo": "Búsqueda determinista (BFS)",
             "entrada": self.entrada,
-            "salidas": dict(self.salidas),
-            "total_caminos": len(caminos),
-            "camino": min(caminos, key=len) if caminos else None,
-            "tiene_solucion": bool(caminos),
+            "salida": self.salida,
+            "camino": self.camino,
+            "tiene_solucion": self.salida is not None,
             "pasos": self.pasos,
             "expandidas": self.expandidas,
-            "retrocesos": self.retrocesos,
+            "celdas_descubiertas": len(self.descubiertas),
             "truncado": self.truncado,
             "motivo_truncado": self.motivo_truncado,
         }
-
 
 class AgenteExploradorFronteras:
     """Explora sin conocer dimensiones ni ubicación de la salida."""

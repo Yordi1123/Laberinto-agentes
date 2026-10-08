@@ -1,4 +1,9 @@
-from laberinto import AgenteExploradorFronteras, Entorno, crear_laberinto
+from laberinto import (
+    AgenteBusquedaDeterminista,
+    AgenteExploradorFronteras,
+    Entorno,
+    crear_laberinto,
+)
 from laberinto.interfaz_canvas import crear_html_animacion, preparar_animacion
 
 
@@ -39,3 +44,21 @@ def test_html_anima_en_el_navegador():
     assert "requestAnimationFrame" in html
     assert "ResizeObserver" in html
     assert "__DATOS_ANIMACION__" not in html
+
+
+def test_estado_final_contiene_unicamente_la_ruta_minima():
+    laberinto, entrada, salida = crear_laberinto(10, 10, semilla=1)
+    informe, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+    datos = preparar_animacion(
+        laberinto,
+        entrada,
+        salida,
+        eventos,
+        informe,
+        "Búsqueda determinista (BFS)",
+        vista_agente=False,
+    )
+
+    if informe["tiene_solucion"]:
+        assert datos["eventos"][-1]["r"] == tuple(informe["camino"])
+    assert "bestPathOnly" in crear_html_animacion(datos)

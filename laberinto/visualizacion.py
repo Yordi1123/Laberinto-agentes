@@ -29,13 +29,15 @@ def dibujar_laberinto(
     salida: Posicion,
     evento: Evento | None = None,
     vista_agente: bool = False,
+    solo_ruta: bool = False,
 ) -> Figure:
     """Crea una figura completa o limitada al conocimiento del agente."""
     filas, columnas = len(laberinto), len(laberinto[0])
-    visitadas = set(evento.visitadas) if evento else set()
-    fronteras = set(evento.fronteras) if evento else set()
+    ocultar_exploracion = bool(solo_ruta and evento and evento.ruta)
+    visitadas = set(evento.visitadas) if evento and not ocultar_exploracion else set()
+    fronteras = set(evento.fronteras) if evento and not ocultar_exploracion else set()
     ruta = set(evento.ruta) if evento else set()
-    conocidas = visitadas | fronteras | {entrada}
+    conocidas = visitadas | fronteras | ruta | {entrada}
     salida_visible = not vista_agente or (
         evento is not None and evento.tipo == "salida" and evento.posicion == salida
     )
@@ -84,7 +86,11 @@ def dibujar_laberinto(
 
     titulo = "Laberinto generado"
     if evento:
-        titulo = f"Paso: {evento.tipo.replace('_', ' ').title()}"
+        titulo = (
+            "Camino mínimo"
+            if ocultar_exploracion
+            else f"Paso: {evento.tipo.replace('_', ' ').title()}"
+        )
     eje.set_title(titulo, fontsize=13, fontweight="bold", pad=10)
     eje.set_xlim(0, columnas)
     eje.set_ylim(0, filas)

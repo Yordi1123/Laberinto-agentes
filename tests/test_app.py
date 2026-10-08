@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from laberinto import crear_laberinto
-from laberinto.visualizacion import dibujar_laberinto
+from laberinto import AgenteBusquedaDeterminista, Entorno, crear_laberinto
+from laberinto.visualizacion import COLORES, dibujar_laberinto
+from matplotlib.colors import to_hex
 import matplotlib.pyplot as plt
 from streamlit.testing.v1 import AppTest
 
@@ -39,4 +40,18 @@ def test_figura_limita_su_tamano_y_muestra_entrada_y_salida():
     assert ancho <= 9
     assert alto <= 6.8
     assert {"S", "E"} <= etiquetas
+    plt.close(figura)
+
+
+def test_figura_final_oculta_marcas_ajenas_al_camino_minimo():
+    laberinto, entrada, salida = crear_laberinto(10, 10, semilla=1)
+    _, eventos = AgenteBusquedaDeterminista(Entorno(laberinto)).ejecutar()
+    figura = dibujar_laberinto(
+        laberinto, entrada, salida, eventos[-1], solo_ruta=True
+    )
+
+    colores = {to_hex(parche.get_facecolor()) for parche in figura.axes[0].patches}
+    assert figura.axes[0].get_title() == "Camino mínimo"
+    assert COLORES["visitada"] not in colores
+    assert COLORES["frontera"] not in colores
     plt.close(figura)

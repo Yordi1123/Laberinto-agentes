@@ -1,13 +1,13 @@
 """Generación, búsqueda y visualización de laberintos."""
 
-from .agentes import AgenteDFS, AgenteExploradorFronteras
+from .agentes import AgenteBusquedaDeterminista, AgenteExploradorFronteras
 from .entorno import Entorno
 from .eventos import Evento
 from .generador import crear_laberinto
 from .modelo import Celda, DIRECCIONES, NOMBRES_DIRECCION
 
 __all__ = [
-    "AgenteDFS",
+    "AgenteBusquedaDeterminista",
     "AgenteExploradorFronteras",
     "Celda",
     "DIRECCIONES",
