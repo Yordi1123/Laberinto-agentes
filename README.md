@@ -14,8 +14,10 @@ La aplicación permite:
 - Configurar las dimensiones y la semilla.
 - Generar laberintos reproducibles.
 - Elegir el algoritmo.
-- Avanzar por una línea de tiempo de eventos.
-- Alternar entre la vista completa y el conocimiento real del agente.
+- Observar el laberinto completo desde la vista del espectador.
+- Reproducir, pausar, reiniciar o recorrer paso a paso la búsqueda animada.
+- Regular la velocidad de reproducción entre 1 y 20 fotogramas por segundo.
+- Alternar con la vista parcial que representa el conocimiento real del agente.
 - Comparar caminos, movimientos, expansiones, retrocesos y replanificaciones.
 
 ```powershell

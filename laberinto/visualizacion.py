@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import matplotlib
+
+# Streamlit renderiza las figuras en memoria; no necesita una ventana de escritorio.
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
@@ -36,8 +40,10 @@ def dibujar_laberinto(
         evento is not None and evento.tipo == "salida" and evento.posicion == salida
     )
 
-    ancho = max(6, columnas * 0.42)
-    alto = max(5, filas * 0.42)
+    # Mantiene el laberinto completo dentro de una pantalla convencional.
+    escala = min(0.55, 9 / columnas, 6.8 / filas)
+    ancho = max(4.5, columnas * escala)
+    alto = max(4, filas * escala)
     figura, eje = plt.subplots(figsize=(ancho, alto))
 
     for fila in range(filas):
@@ -61,17 +67,18 @@ def dibujar_laberinto(
                 continue
             celda = laberinto[fila][columna]
             if celda.pared_superior:
-                eje.plot((x, x + 1), (y + 1, y + 1), color="#111827", linewidth=2)
+                eje.plot((x, x + 1), (y + 1, y + 1), color="#111827", linewidth=1.6)
             if celda.pared_inferior:
-                eje.plot((x, x + 1), (y, y), color="#111827", linewidth=2)
+                eje.plot((x, x + 1), (y, y), color="#111827", linewidth=1.6)
             if celda.pared_izquierda:
-                eje.plot((x, x), (y, y + 1), color="#111827", linewidth=2)
+                eje.plot((x, x), (y, y + 1), color="#111827", linewidth=1.6)
             if celda.pared_derecha:
-                eje.plot((x + 1, x + 1), (y, y + 1), color="#111827", linewidth=2)
+                eje.plot((x + 1, x + 1), (y, y + 1), color="#111827", linewidth=1.6)
 
-    _etiqueta(eje, entrada, filas, "S", "#0f766e")
+    # Entrada y salida se colocan en una esquina para no tapar al agente.
+    _etiqueta(eje, entrada, filas, "S", "#0f766e", centrada=False)
     if salida_visible:
-        _etiqueta(eje, salida, filas, "E", "#15803d")
+        _etiqueta(eje, salida, filas, "E", "#15803d", centrada=False)
     if evento and evento.posicion is not None:
         _etiqueta(eje, evento.posicion, filas, "A", "#ffffff")
 
@@ -87,15 +94,25 @@ def dibujar_laberinto(
     return figura
 
 
-def _etiqueta(eje, posicion: Posicion, filas: int, texto: str, color: str) -> None:
+def _etiqueta(
+    eje,
+    posicion: Posicion,
+    filas: int,
+    texto: str,
+    color: str,
+    centrada: bool = True,
+) -> None:
     fila, columna = posicion
+    x = columna + (0.5 if centrada else 0.17)
+    y = filas - fila - (0.5 if centrada else 0.18)
     eje.text(
-        columna + 0.5,
-        filas - fila - 0.5,
+        x,
+        y,
         texto,
-        ha="center",
-        va="center",
+        ha="center" if centrada else "left",
+        va="center" if centrada else "top",
         color=color,
-        fontsize=10,
+        fontsize=10 if centrada else 8,
         fontweight="bold",
+        zorder=5,
     )
