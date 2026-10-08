@@ -1,5 +1,7 @@
 # Agentes inteligentes en un laberinto
 
+🚀 **Aplicación en vivo:** [Jugar con el simulador en Streamlit](https://laberinto-agentes-negkceajbljalgglgalgkg.streamlit.app/)
+
 Este proyecto académico implementa y compara dos estrategias de búsqueda sobre laberintos aleatorios:
 
 - **DFS determinista:** Algoritmo exhaustivo que explora sistemáticamente para encontrar todos los caminos posibles hasta la salida, implementando backtracking para contar las rutas totales y evitar ciclos infinitos.
